@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HOCS演示：雷达脉冲调制与工程权衡</title>
+    <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']]
+      }
+    };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #1e40af;
+            --accent-color: #ef4444;
+            --bg-color: #f8fafc;
+            --panel-bg: #ffffff;
+            --text-color: #1e293b;
+            --border-color: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+        }
+
+        /* 顶部标题栏 */
+        .header {
+            grid-column: 1 / -1;
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border-left: 6px solid var(--primary-color);
+        }
+
+        .header h1 { margin: 0; font-size: 1.5rem; color: var(--secondary-color); }
+        .header p { margin: 5px 0 0; color: #64748b; }
+
+        /* 左侧面板：题目与控制 */
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--panel-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border: 1px solid var(--border-color);
+        }
+
+        .card h2 {
+            font-size: 1.1rem;
+            margin-top: 0;
+            border-bottom: 2px solid #f1f5f9;
+            padding-bottom: 10px;
+            color: var(--secondary-color);
+        }
+
+        .problem-text {
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #475569;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: flex;
+            justify-content: space-between;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: var(--primary-color);
+        }
+
+        .metric-box {
+            background: #f1f5f9;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            font-family: 'Courier New', monospace;
+        }
+
+        .metric-formula {
+            font-size: 0.85rem;
+            color: #64748b;
+            margin-top: 5px;
+            font-family: 'Times New Roman', serif;
+            font-style: italic;
+        }
+
+        /* 权衡分析仪表 */
+        .tradeoff-meter {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 5px;
+            font-size: 0.8rem;
+        }
+        .bar-container {
+            flex-grow: 1;
+            height: 8px;
+            background: #e2e8f0;
+            margin: 0 10px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .bar-fill {
+            height: 100%;
+            transition: width 0.3s, background-color 0.3s;
+        }
+
+        /* 右侧面板：可视化 */
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        canvas {
+            width: 100%;
+            height: 300px;
+            background: #fff;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .plot-container {
+            position: relative;
+        }
+        .plot-label {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255,255,255,0.9);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: #334155;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+
+        /* 公式显示 */
+        .formula {
+            background: #f8fafc;
+            padding: 8px;
+            border-left: 3px solid var(--accent-color);
+            font-family: 'Times New Roman', serif;
+            font-style: italic;
+            margin: 10px 0;
+            font-size: 0.9rem;
+            overflow-x: auto; /* 防止长公式溢出 */
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .container { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="gatekeeper" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.98); z-index: 99999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; backdrop-filter: blur(5px);">
+    
+    <div style="background: white; width: 60px; height: 60px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+        <span style="font-size: 30px; font-weight: bold; color: #2563eb;">📡</span>
+    </div>
+
+    <h1 style="color: #fff; margin: 0 0 10px 0; font-size: 24px;">HOCS Radar Pulse Demo</h1>
+    <p style="color: #94a3b8; max-width: 400px; margin-bottom: 30px; font-size: 14px;">
+        雷达脉冲调制与频谱权衡交互演示。<br>
+        如您是校外学习者，请购买离线正式版。
+    </p>
+    
+    <div style="margin-bottom: 40px; padding: 25px; border: 1px solid #3b82f6; border-radius: 12px; background: rgba(37, 99, 235, 0.1); width: 90%; max-width: 350px;">
+        <h3 style="margin-top: 0; color: #60a5fa; font-size: 18px;">获取完整离线版 (Windows/Mac)</h3>
+        <ul style="text-align: left; font-size: 14px; color: #cbd5e1; margin-bottom: 20px; line-height: 1.6;">
+            <li>✅ 实时调节脉宽与载频</li>
+            <li>✅ 动态观察频谱展宽现象</li>
+            <li>✅ 深度解析工程权衡策略</li>
+        </ul>
+        <a href="https://mianbaoduo.com/o/你的链接" target="_blank" style="display:block; background: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px; transition: 0.3s; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
+            即将上线 (¥ ？)
+        </a>
+    </div>
+
+    <div style="border-top: 1px solid #334155; padding-top: 20px; width: 300px;">
+        <p style="font-size: 13px; color: #94a3b8; margin-bottom: 10px;">本校学生请输入课程口令：</p>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+            <input type="text" id="passInput" placeholder="输入口令" style="padding: 10px; border-radius: 6px; border: 1px solid #475569; background: #1e293b; color: white; outline: none; flex: 1;">
+            <button onclick="checkPass()" style="padding: 10px 20px; border-radius: 6px; background: #475569; color: white; font-weight: bold; transition: background 0.2s;">解锁</button>
+        </div>
+        <p id="errorMsg" style="color: #ef4444; font-size: 12px; margin-top: 10px; display: none;">口令错误</p>
+    </div>
+</div>
+
+<script>
+    // === 配置区域 ===
+    // "tute2025EE2302_04" 的 Base64 编码
+    const ENCRYPTED_KEY = "dHV0ZTIwMjVFRTIzMDJfMDQ="; 
+    // ===============
+
+    function unlock() {
+        const gate = document.getElementById('gatekeeper');
+        gate.style.opacity = '0';
+        gate.style.transition = 'opacity 0.5s ease';
+        setTimeout(() => {
+            gate.style.display = 'none';
+        }, 500); 
+        
+        // 存入缓存 (使用不同的key防止冲突)
+        localStorage.setItem('course_auth_radar_hocs', ENCRYPTED_KEY);
+    }
+
+    function checkPass() {
+        const input = document.getElementById('passInput').value;
+        const errorMsg = document.getElementById('errorMsg');
+        
+        try {
+            if (btoa(input) === ENCRYPTED_KEY) {
+                unlock();
+            } else {
+                throw new Error();
+            }
+        } catch (e) {
+            errorMsg.style.display = 'block';
+            const inputEl = document.getElementById('passInput');
+            inputEl.style.borderColor = '#ef4444';
+            inputEl.animate([
+                { transform: 'translateX(0)' },
+                { transform: 'translateX(-5px)' },
+                { transform: 'translateX(5px)' },
+                { transform: 'translateX(0)' }
+            ], { duration: 300 });
+        }
+    }
+
+    // 自动检测逻辑
+    (function initAuth() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlKey = urlParams.get('auth');
+        const cachedToken = localStorage.getItem('course_auth_radar_hocs');
+
+        if (urlKey && btoa(urlKey) === ENCRYPTED_KEY) {
+            unlock();
+            return;
+        }
+
+        if (cachedToken === ENCRYPTED_KEY) {
+            document.getElementById('gatekeeper').style.display = 'none';
+        }
+    })();
+</script>
+<div class="container">
+    <div class="header">
+        <h1>HOCS 演示：雷达脉冲调制系统</h1>
+        <p>Topic: Radar Pulse Modulation Spectrum Analysis & Engineering Trade-offs</p>
+    </div>
+
+    <div class="left-panel">
+        <div class="card">
+            <h2>🧩 题目背景 (Problem Context)</h2>
+            <div class="problem-text">
+                <p>已知基带控制信号 $f(t)$ 为矩形脉冲，脉宽为 $\tau$。该信号对载波 $\cos(\omega_c t)$ 进行调制，生成发射信号 $g(t) = f(t)\cos(\omega_c t)$。</p>
+                <div class="formula">
+                    $$G(j\omega) = \frac{E\tau}{2} [\text{Sa}(\frac{(\omega-\omega_c)\tau}{2}) + \text{Sa}(\frac{(\omega+\omega_c)\tau}{2})]$$
+                </div>
+                <p><strong>探究任务：</strong>调整脉宽 $\tau$，观察频谱带宽 $B_{null}$ 的变化，并分析这其中的工程权衡。</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🎛️ 参数控制 (Controls)</h2>
+            
+            <div class="control-group">
+                <label>
+                    <span>脉冲宽度 $\tau$ (Pulse Width)</span>
+                    <span id="val-tau">2.0 s</span>
+                </label>
+                <input type="range" id="slider-tau" min="0.5" max="5.0" step="0.1" value="2.0">
+                <div class="tradeoff-meter">
+                    <span>低分辨率</span>
+                    <div class="bar-container"><div class="bar-fill" id="bar-res" style="width: 50%; background: #22c55e;"></div></div>
+                    <span>高分辨率</span>
+                </div>
+                <p style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">*$\tau$ 越小，雷达测距越准</p>
+            </div>
+
+            <div class="control-group">
+                <label>
+                    <span>载波频率 $\omega_c$ (Carrier Freq)</span>
+                    <span id="val-wc">20 rad/s</span>
+                </label>
+                <input type="range" id="slider-wc" min="10" max="40" step="1" value="20">
+            </div>
+
+            <div class="metric-box">
+                <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 5px;">第一零点带宽 (Bandwidth)</div>
+                <div class="metric-value" id="val-bw">0.00 rad/s</div>
+                <div class="metric-formula">
+                    $$B_{null} = \frac{4\pi}{\tau}$$
+                </div>
+                <div class="tradeoff-meter" style="margin-top: 8px;">
+                    <span>窄带(省资源)</span>
+                    <div class="bar-container"><div class="bar-fill" id="bar-bw" style="width: 50%; background: #eab308;"></div></div>
+                    <span>宽带(易干扰)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card
